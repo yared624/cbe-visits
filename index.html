@@ -66,7 +66,7 @@ window.addEventListener('error', function (e) {
 <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 border-t-4 border-cbe-gold">
 <h2 class="text-xl font-bold text-cbe-purple text-center">Commercial Bank of Ethiopia</h2>
 <p class="text-xs text-center text-gray-500 mb-6">Hawassa District — Branch Visit Evaluator</p>
-<p class="text-[10px] text-center text-gray-400 -mt-4 mb-4">version 2 (Firebase)</p>
+<p class="text-[10px] text-center text-gray-400 -mt-4 mb-4">version 3 (Firebase)</p>
 <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1" for="loginUser">User name</label>
 <input id="loginUser" type="text" autocomplete="username" class="w-full border rounded-lg px-3 py-2 mb-4 text-sm focus:outline-none focus:ring-2 focus:ring-cbe-purple" onkeydown="if(event.key==='Enter')document.getElementById('loginPass').focus()">
 <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1" for="loginPass">Password</label>
@@ -211,7 +211,34 @@ window.addEventListener('error', function (e) {
 </div>
 <div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
 <h3 class="text-lg font-bold text-cbe-purple mb-4 flex items-center gap-2">
-<i data-lucide="bar-chart-3" class="w-5 h-5 text-cbe-gold"></i> Section-Wise Performance Summary
+<i data-lucide="database" class="w-5 h-5 text-cbe-gold"></i> Branch Visit Results
+</h3>
+<div class="overflow-x-auto">
+<table class="w-full text-sm text-left text-gray-600">
+<thead class="bg-cbe-purple text-white text-xs uppercase font-semibold">
+<tr>
+<th class="py-3 px-3">Date</th>
+<th class="py-3 px-3">Branch</th>
+<th class="py-3 px-3">Cluster</th>
+<th class="py-3 px-2 text-center" title="Office Environment">S1</th>
+<th class="py-3 px-2 text-center" title="Lobby Area">S2</th>
+<th class="py-3 px-2 text-center" title="Window Management">S3</th>
+<th class="py-3 px-2 text-center" title="Employee Behavior">S4</th>
+<th class="py-3 px-2 text-center" title="Resource Mobilization and Digital Banking">S5</th>
+<th class="py-3 px-2 text-center" title="General Operational View">S6</th>
+<th class="py-3 px-2 text-center" title="Other Observations">S7</th>
+<th class="py-3 px-3 text-center">Score</th>
+<th class="py-3 px-3">Rating</th>
+</tr>
+</thead>
+<tbody id="branchResultsBody" class="divide-y divide-gray-200 font-medium"></tbody>
+</table>
+</div>
+<p class="text-xs text-gray-400 mt-3">S1 to S7 are the section scores in %. Section 5 carries 50% of the weight.</p>
+</div>
+<div class="bg-white rounded-xl shadow-md border border-gray-200 p-6">
+<h3 class="text-lg font-bold text-cbe-purple mb-4 flex items-center gap-2">
+<i data-lucide="bar-chart-3" class="w-5 h-5 text-cbe-gold"></i> Current Checklist: Section Scores
 </h3>
 <div class="overflow-x-auto">
 <table class="w-full text-sm text-left text-gray-600">
@@ -588,7 +615,38 @@ function resetChecklist(silent) {
   calculateScore();
 }
 
+function escHtml(t) {
+  return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function renderBranchResults() {
+  const body = document.getElementById('branchResultsBody');
+  if (!body) return;
+  const recs = visibleRecords().slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  if (!recs.length) {
+    body.innerHTML = '<tr><td colspan="12" class="py-6 px-3 text-center text-gray-400">No saved visits yet.</td></tr>';
+    return;
+  }
+  body.innerHTML = recs.map(r => {
+    const cells = CHECKLIST.map(sec => {
+      let ev = 0, yes = 0;
+      sec.items.forEach(it => {
+        const a = r.answers ? r.answers[it.id] : null;
+        if (a === '1') { ev++; yes++; } else if (a === '0') { ev++; }
+      });
+      return '<td class="py-3 px-2 text-center">' + (ev ? ((yes / ev) * 100).toFixed(0) + '%' : '-') + '</td>';
+    }).join('');
+    const sc = Number(r.score) || 0;
+    const color = sc >= 75 ? 'text-green-600' : (sc >= 60 ? 'text-amber-600' : 'text-red-600');
+    return '<tr><td class="py-3 px-3 whitespace-nowrap">' + escHtml(r.date) + '</td><td class="py-3 px-3">' + escHtml(r.branch) + '</td><td class="py-3 px-3">' + escHtml(r.cluster) + '</td>' + cells +
+      '<td class="py-3 px-3 text-center font-bold ' + color + '">' + sc.toFixed(1) + '%</td><td class="py-3 px-3 whitespace-nowrap">' + gradeOf(sc) + '</td></tr>';
+  }).join('');
+}
+
 function renderClusterOverview() {
+  renderBranchResults();
   const recs = visibleRecords();
   const clusters = (CURRENT_USER.r !== 'admin' && CURRENT_USER.c) ? [CURRENT_USER.c] : CLUSTERS;
   document.getElementById('clusterOverviewBody').innerHTML = clusters.map(c => {
